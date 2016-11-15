@@ -2,21 +2,28 @@
 # vim: ft=sls
 
 {% from "letsencrypt/map.jinja" import letsencrypt with context %}
+{% set os_family = salt['grains.get']('os_family', None) %}
+
+{% if os_family == 'FreeBSD' %}
+{% set date_cmd = 'date -j -f "%b %d %T %Y %Z" ' %}
+{% else %}
+{% set date_cmd = 'date -d ' %}
+{% endif %}
 
 
 /usr/local/bin/check_letsencrypt_cert.sh:
   file.managed:
     - mode: 755
     - contents: |
-        #!/bin/bash
+        #!/bin/sh
 
         FIRST_CERT=$1
 
         for DOMAIN in "$@"
         do
-            openssl x509 -in /etc/letsencrypt/live/$1/cert.pem -noout -text | grep DNS:${DOMAIN} > /dev/null || exit 1
+            openssl x509 -in {{ letsencrypt.config_directory }}/live/$1/cert.pem -noout -text | grep DNS:${DOMAIN} > /dev/null || exit 1
         done
-        CERT=$(date -d "$(openssl x509 -in /etc/letsencrypt/live/$1/cert.pem -enddate -noout | cut -d'=' -f2)" "+%s")
+        CERT=$({{ date_cmd }} "$(openssl x509 -in {{ letsencrypt.config_directory }}/live/$1/cert.pem -enddate -noout | cut -d'=' -f2)" "+%s")
         CURRENT=$(date "+%s")
         REMAINING=$((($CERT - $CURRENT) / 60 / 60 / 24))
         [ "$REMAINING" -gt "30" ] || exit 1
@@ -39,10 +46,7 @@
 create-initial-cert-{{ setname }}-{{ domainlist | join('+') }}:
   cmd.run:
     - unless: /usr/local/bin/check_letsencrypt_cert.sh {{ domainlist|join(' ') }}
-    - name: {{
-          letsencrypt.cli_install_dir
-        }}/letsencrypt-auto -d {{ domainlist|join(' -d ') }} certonly
-    - cwd: {{ letsencrypt.cli_install_dir }}
+    - name: certbot -d {{ domainlist|join(' -d ') }} certonly
     - require:
       - file: letsencrypt-config
       - file: /usr/local/bin/check_letsencrypt_cert.sh
@@ -64,11 +68,11 @@ letsencrypt-crontab-{{ setname }}-{{ domainlist[0] }}:
 create-fullchain-privkey-pem-for-{{ domainlist[0] }}:
   cmd.run:
     - name: |
-        cat /etc/letsencrypt/live/{{ domainlist[0] }}/fullchain.pem \
-            /etc/letsencrypt/live/{{ domainlist[0] }}/privkey.pem \
-            > /etc/letsencrypt/live/{{ domainlist[0] }}/fullchain-privkey.pem && \
-        chmod 600 /etc/letsencrypt/live/{{ domainlist[0] }}/fullchain-privkey.pem
-    - creates: /etc/letsencrypt/live/{{ domainlist[0] }}/fullchain-privkey.pem
+        cat {{ letsencrypt.config_directory }}/live/{{ domainlist[0] }}/fullchain.pem \
+            {{ letsencrypt.config_directory }}/live/{{ domainlist[0] }}/privkey.pem \
+            > {{ letsencrypt.config_directory }}/live/{{ domainlist[0] }}/fullchain-privkey.pem && \
+        chmod 600 {{ letsencrypt.config_directory }}/live/{{ domainlist[0] }}/fullchain-privkey.pem
+    - creates: {{ letsencrypt.config_directory }}/live/{{ domainlist[0] }}/fullchain-privkey.pem
     - require:
       - cmd: create-initial-cert-{{ setname }}-{{ domainlist | join('+') }}
 

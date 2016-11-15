@@ -1,18 +1,22 @@
-#!/bin/bash
-{% from "letsencrypt/map.jinja" import letsencrypt with context %}
+#!/bin/sh
+{%- from "letsencrypt/map.jinja" import letsencrypt with context -%}
+{%- set os_family = salt['grains.get']('os_family', None) -%}
+{% if os_family == 'FreeBSD' %}
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/games:/usr/local/sbin:/usr/local/bin
+{% endif %}
 COMMON_NAME="$1"
 
 JOINED=""
 for DOMAIN in "$@"
 do
-    JOINED+=" -d $DOMAIN"
+    JOINED="$JOINED -d $DOMAIN"
 done
 
 if ! /usr/local/bin/check_letsencrypt_cert.sh "$@" > /dev/null
 then
-    {{ letsencrypt.cli_install_dir }}/letsencrypt-auto certonly $JOINED || exit 1
-    cat /etc/letsencrypt/live/${COMMON_NAME}/fullchain.pem \
-        /etc/letsencrypt/live/${COMMON_NAME}/privkey.pem \
-        > /etc/letsencrypt/live/${COMMON_NAME}/fullchain-privkey.pem || exit 1
-    chmod 600 /etc/letsencrypt/live/${COMMON_NAME}/fullchain-privkey.pem || exit 1
+    certbot certonly $JOINED || exit 1
+    cat {{ letsencrypt.config_directory }}/live/${COMMON_NAME}/fullchain.pem \
+        {{ letsencrypt.config_directory }}/live/${COMMON_NAME}/privkey.pem \
+        > {{ letsencrypt.config_directory }}/live/${COMMON_NAME}/fullchain-privkey.pem || exit 1
+    chmod 600 {{ letsencrypt.config_directory }}/live/${COMMON_NAME}/fullchain-privkey.pem || exit 1
 fi

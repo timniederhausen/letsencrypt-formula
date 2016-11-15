@@ -15,7 +15,11 @@ here that differ from whats in defaults.yaml
       'Suse': {},
       'Arch': {},
       'RedHat': {},
-      'FreeBSD': {},
+      'FreeBSD': {
+        'package': 'py27-certbot',
+        'config_file': '/usr/local/etc/letsencrypt/cli.ini',
+        'config_directory': '/usr/local/etc/letsencrypt',
+      },
     },
     grain="os_family",
     merge=salt['pillar.get']('letsencrypt:lookup')

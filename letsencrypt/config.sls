@@ -5,6 +5,13 @@
 
 letsencrypt-config:
   file.managed:
-    - name: /etc/letsencrypt/cli.ini
+    - name: {{ letsencrypt.config_file }}
     - makedirs: true
     - contents_pillar: letsencrypt:config
+
+{% if letsencrypt.challenges_directory is defined %}
+letsencrypt_challenges_dir:
+  file.directory:
+    - name: {{ letsencrypt.challenges_directory }}
+    - makedirs: true
+{% endif %}
