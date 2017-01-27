@@ -10,7 +10,6 @@
 {% set date_cmd = 'date -d ' %}
 {% endif %}
 
-
 /usr/local/bin/check_letsencrypt_cert.sh:
   file.managed:
     - mode: 755
@@ -48,8 +47,12 @@ create-initial-cert-{{ setname }}-{{ domainlist | join('+') }}:
     - unless: /usr/local/bin/check_letsencrypt_cert.sh {{ domainlist|join(' ') }}
     - name: certbot -d {{ domainlist|join(' -d ') }} certonly
     - require:
+      - pkg: letsencrypt_package
       - file: letsencrypt-config
       - file: /usr/local/bin/check_letsencrypt_cert.sh
+{% if letsencrypt.challenges_directory is defined %}
+      - file: letsencrypt_challenges_dir
+{% endif %}
 
 # domainlist[0] represents the "CommonName", and the rest
 # represent SubjectAlternativeNames
@@ -75,5 +78,4 @@ create-fullchain-privkey-pem-for-{{ domainlist[0] }}:
     - creates: {{ letsencrypt.config_directory }}/live/{{ domainlist[0] }}/fullchain-privkey.pem
     - require:
       - cmd: create-initial-cert-{{ setname }}-{{ domainlist | join('+') }}
-
 {% endfor %}
